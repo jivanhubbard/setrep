@@ -6,7 +6,7 @@ import { RecommendationsPanel } from "@/components/recommendations-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Database } from "@/lib/database.types";
-import { computeRecommendations } from "@/lib/recommendations";
+import { computeRecommendations, mondayBasedDayIndex } from "@/lib/recommendations";
 import { createClient } from "@/lib/supabase/server";
 
 type ExerciseRow = Database["public"]["Tables"]["exercises"]["Row"];
@@ -49,6 +49,8 @@ export default async function HomePage() {
   })[];
 
   const templateId = profile?.program_template_id;
+  const todayDayIndex = mondayBasedDayIndex(now);
+
   let templateDays: Database["public"]["Tables"]["template_days"]["Row"][] = [];
   if (templateId) {
     const { data: td } = await supabase
@@ -65,12 +67,28 @@ export default async function HomePage() {
     .or(`user_id.is.null,user_id.eq.${user.id}`);
 
   const exercises = (exercisesRaw ?? []) as ExerciseRow[];
+  const exerciseById = new Map(exercises.map((e) => [e.id, e]));
+
+  let savedDayExercises: ExerciseRow[] = [];
+  if (templateId) {
+    const { data: savedRows } = await supabase
+      .from("user_template_day_exercises")
+      .select("exercise_id, sort_order")
+      .eq("user_id", user.id)
+      .eq("program_template_id", templateId)
+      .eq("day_index", todayDayIndex)
+      .order("sort_order");
+    savedDayExercises = (savedRows ?? [])
+      .map((r) => exerciseById.get(r.exercise_id))
+      .filter((ex): ex is ExerciseRow => ex != null);
+  }
 
   const rec = computeRecommendations({
     now,
     templateDays,
     exercises,
     recentSessions: sessions,
+    savedDayExercises: savedDayExercises.length > 0 ? savedDayExercises : null,
   });
 
   const weeklyTarget = profile?.days_per_week ?? 4;
@@ -139,7 +157,12 @@ export default async function HomePage() {
         </Card>
       </div>
 
-      <RecommendationsPanel rec={rec} suggestedTitle={rec.suggestedTitle} />
+      <RecommendationsPanel
+        rec={rec}
+        suggestedTitle={rec.suggestedTitle}
+        programTemplateId={templateId ?? null}
+        dayIndex={todayDayIndex}
+      />
     </div>
   );
 }

@@ -19,7 +19,8 @@ export type RecommendationResult = {
   muscleRecovery: { muscle: string; hoursSinceLast: number | null; needsRest: boolean }[];
 };
 
-function mondayBasedDayIndex(date: Date): number {
+/** Monday = 0 … Sunday = 6 */
+export function mondayBasedDayIndex(date: Date): number {
   const d = date.getDay();
   return d === 0 ? 6 : d - 1;
 }
@@ -58,8 +59,10 @@ export function computeRecommendations(input: {
   recentSessions: (SessionRow & {
     workout_entries: (EntryRow & { exercises: ExerciseRow | null })[];
   })[];
+  /** When set, overrides heuristic picks for this weekday slot */
+  savedDayExercises?: ExerciseRow[] | null;
 }): RecommendationResult {
-  const { now, templateDays, exercises, recentSessions } = input;
+  const { now, templateDays, exercises, recentSessions, savedDayExercises } = input;
   const dayIndex = mondayBasedDayIndex(now);
   const td = templateDays.find((t) => t.day_index === dayIndex) ?? null;
 
@@ -96,31 +99,41 @@ export function computeRecommendations(input: {
   const pickMuscles = targetMuscles.length ? targetMuscles : templateMuscles;
 
   const globalExercises = exercises.filter((e) => !e.user_id);
-  const suggestedExercises: RecommendationResult["suggestedExercises"] = [];
+  let suggestedExercises: RecommendationResult["suggestedExercises"] = [];
 
-  for (const muscle of pickMuscles.slice(0, 3)) {
-    const candidates = globalExercises.filter((ex) => ex.muscle_group === muscle);
-    const lastSession = recentSessions[0];
-    let best = candidates[0];
-    if (lastSession) {
-      const prev = lastSession.workout_entries.find(
-        (en) => en.exercises?.muscle_group === muscle
-      );
-      if (prev?.exercises) {
-        const same = candidates.find((c) => c.id === prev.exercises?.id);
-        if (same) {
-          best = same;
-          reasons.push(`Progress ${same.name}: try a small weight bump or +1 rep from last time.`);
+  if (savedDayExercises && savedDayExercises.length > 0) {
+    reasons.push("Using your saved starter exercises for this weekday.");
+    suggestedExercises = savedDayExercises.map((ex) => ({
+      id: ex.id,
+      name: ex.name,
+      muscle_group: ex.muscle_group,
+      reason: "Saved for this day in your program",
+    }));
+  } else {
+    for (const muscle of pickMuscles.slice(0, 3)) {
+      const candidates = globalExercises.filter((ex) => ex.muscle_group === muscle);
+      const lastSession = recentSessions[0];
+      let best = candidates[0];
+      if (lastSession) {
+        const prev = lastSession.workout_entries.find(
+          (en) => en.exercises?.muscle_group === muscle
+        );
+        if (prev?.exercises) {
+          const same = candidates.find((c) => c.id === prev.exercises?.id);
+          if (same) {
+            best = same;
+            reasons.push(`Progress ${same.name}: try a small weight bump or +1 rep from last time.`);
+          }
         }
       }
-    }
-    if (best) {
-      suggestedExercises.push({
-        id: best.id,
-        name: best.name,
-        muscle_group: best.muscle_group,
-        reason: `Matches today's "${muscle}" focus`,
-      });
+      if (best) {
+        suggestedExercises.push({
+          id: best.id,
+          name: best.name,
+          muscle_group: best.muscle_group,
+          reason: `Matches today's "${muscle}" focus`,
+        });
+      }
     }
   }
 

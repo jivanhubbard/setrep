@@ -47,16 +47,42 @@ function buildEntryFromInitial(e: SaveWorkoutInput["entries"][0]): EntryState {
   };
 }
 
+function buildEntriesFromSuggestedIds(
+  suggestedExerciseIds: string[],
+  exerciseOptions: ExerciseOption[]
+): EntryState[] {
+  const byId = new Map(exerciseOptions.map((e) => [e.id, e]));
+  const defaultSets = () => [
+    { reps: "8", weight: "0" },
+    { reps: "8", weight: "0" },
+    { reps: "8", weight: "0" },
+  ];
+  return suggestedExerciseIds
+    .map((id) => byId.get(id))
+    .filter((e): e is ExerciseOption => Boolean(e))
+    .map((ex) => ({
+      key: uid(),
+      mode: "library" as const,
+      exerciseId: ex.id,
+      customName: "",
+      muscleGroup: ex.muscle_group,
+      sets: defaultSets(),
+    }));
+}
+
 export function WorkoutForm({
   exercises,
   weightUnit,
   suggestedTitle,
+  suggestedExerciseIds,
   initial,
   sessionId,
 }: {
   exercises: ExerciseOption[];
   weightUnit: "lb" | "kg";
   suggestedTitle?: string;
+  /** From home recommendations — pre-fills exercises in order */
+  suggestedExerciseIds?: string[];
   initial?: SaveWorkoutInput;
   sessionId?: string;
 }) {
@@ -76,6 +102,12 @@ export function WorkoutForm({
   const [entries, setEntries] = useState<EntryState[]>(() => {
     if (initial?.entries?.length) {
       return initial.entries.map(buildEntryFromInitial);
+    }
+    if (suggestedExerciseIds?.length) {
+      const fromSuggestion = buildEntriesFromSuggestedIds(suggestedExerciseIds, exercises);
+      if (fromSuggestion.length > 0) {
+        return fromSuggestion;
+      }
     }
     return [
       {

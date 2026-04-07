@@ -7,9 +7,16 @@ type ExerciseRow = Database["public"]["Tables"]["exercises"]["Row"];
 export default async function NewWorkoutPage({
   searchParams,
 }: {
-  searchParams: Promise<{ suggestedTitle?: string }>;
+  searchParams: Promise<{ suggestedTitle?: string; exercises?: string }>;
 }) {
-  const { suggestedTitle } = await searchParams;
+  const { suggestedTitle, exercises: exercisesQuery } = await searchParams;
+
+  const suggestedExerciseIds = exercisesQuery
+    ? exercisesQuery
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean)
+    : [];
   const supabase = await createClient();
   const {
     data: { user },
@@ -31,6 +38,9 @@ export default async function NewWorkoutPage({
 
   const exercises = (exercisesRaw ?? []) as Pick<ExerciseRow, "id" | "name" | "muscle_group">[];
 
+  const allowedIds = new Set(exercises.map((e) => e.id));
+  const filteredSuggestionIds = suggestedExerciseIds.filter((id) => allowedIds.has(id));
+
   return (
     <div className="space-y-8 max-w-2xl">
       <div>
@@ -41,6 +51,7 @@ export default async function NewWorkoutPage({
         exercises={exercises}
         weightUnit={profile?.weight_unit ?? "lb"}
         suggestedTitle={suggestedTitle}
+        suggestedExerciseIds={filteredSuggestionIds.length > 0 ? filteredSuggestionIds : undefined}
       />
     </div>
   );

@@ -1,16 +1,32 @@
 import Link from "next/link";
 
+import { SaveProgramDayButton } from "@/components/save-program-day-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { RecommendationResult } from "@/lib/recommendations";
 
+/** Query string for /workouts/new: title + comma-separated exercise UUIDs */
+export function buildLogWorkoutHref(suggestedTitle: string, exerciseIds: string[]) {
+  const params = new URLSearchParams();
+  params.set("suggestedTitle", suggestedTitle);
+  if (exerciseIds.length > 0) {
+    params.set("exercises", exerciseIds.join(","));
+  }
+  return `/workouts/new?${params.toString()}`;
+}
+
 export function RecommendationsPanel({
   rec,
   suggestedTitle,
+  programTemplateId,
+  dayIndex,
 }: {
   rec: RecommendationResult;
   suggestedTitle: string;
+  programTemplateId: string | null;
+  dayIndex: number;
 }) {
+  const exerciseIds = rec.suggestedExercises.map((e) => e.id);
   return (
     <Card className="border-accent/30">
       <CardHeader>
@@ -53,13 +69,26 @@ export function RecommendationsPanel({
             fatigued.
           </div>
         )}
-        <Button asChild>
-          <Link
-            href={`/workouts/new?suggestedTitle=${encodeURIComponent(rec.suggestedTitle)}`}
-          >
-            Log this workout
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-start gap-3">
+          <Button asChild>
+            <Link href={buildLogWorkoutHref(rec.suggestedTitle, exerciseIds)}>
+              Log this workout
+            </Link>
+          </Button>
+          {programTemplateId && exerciseIds.length > 0 ? (
+            <SaveProgramDayButton
+              programTemplateId={programTemplateId}
+              dayIndex={dayIndex}
+              exerciseIds={exerciseIds}
+            />
+          ) : (
+            <p className="text-xs text-muted-foreground self-center max-w-[14rem]">
+              {programTemplateId
+                ? "No starter exercises to save yet."
+                : "Pick a program in Settings to save a reusable starter list for each weekday."}
+            </p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

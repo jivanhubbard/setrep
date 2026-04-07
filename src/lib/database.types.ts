@@ -74,6 +74,35 @@ export type Database = {
           muscle_groups: string[];
         };
       };
+      user_template_day_exercises: {
+        Row: {
+          id: string;
+          user_id: string;
+          program_template_id: string;
+          day_index: number;
+          exercise_id: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          program_template_id: string;
+          day_index: number;
+          exercise_id: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          program_template_id?: string;
+          day_index?: number;
+          exercise_id?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+      };
       exercises: {
         Row: {
           id: string;
