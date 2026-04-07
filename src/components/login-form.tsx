@@ -12,9 +12,11 @@ import { Label } from "@/components/ui/label";
 export function LoginForm({ authError }: { authError?: string }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "sent" | "error">("idle");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSubmitError(null);
     setStatus("loading");
     const supabase = createClient();
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -25,6 +27,7 @@ export function LoginForm({ authError }: { authError?: string }) {
       },
     });
     if (error) {
+      setSubmitError(error.message);
       setStatus("error");
       return;
     }
@@ -65,7 +68,12 @@ export function LoginForm({ authError }: { authError?: string }) {
               <Button type="submit" className="w-full" disabled={status === "loading"}>
                 {status === "loading" ? "Sending…" : "Send magic link"}
               </Button>
-              {status === "error" && (
+              {status === "error" && submitError && (
+                <p className="text-sm text-destructive" role="alert">
+                  {submitError}
+                </p>
+              )}
+              {status === "error" && !submitError && (
                 <p className="text-sm text-destructive">Something went wrong. Try again.</p>
               )}
             </form>
